@@ -37,7 +37,7 @@ const CONCEPT_PREVIEWS = {
   'Watercolour Painting': 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=400&q=80' 
 };
 
-// Convert Base64 ke Blob (Agar aman untuk file ukuran besar)
+// Convert Base64 ke Blob 
 const b64toBlob = (b64Data, contentType = '', sliceSize = 512) => {
   const byteCharacters = atob(b64Data);
   const byteArrays = [];
@@ -66,13 +66,11 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   
-  // State untuk Toast Notification saat Download
   const [toastMessage, setToastMessage] = useState(null);
   
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    // Memuat jsPDF untuk fitur unduh PDF
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     script.async = true;
@@ -84,7 +82,7 @@ export default function App() {
 
   const showToast = (message, type = 'success') => {
     setToastMessage({ text: message, type });
-    setTimeout(() => setToastMessage(null), 4000);
+    setTimeout(() => setToastMessage(null), 3000); // Dipercepat
   };
 
   const goToPage = (pageNumber) => {
@@ -92,10 +90,11 @@ export default function App() {
     const randomQuote = PET_QUOTES[Math.floor(Math.random() * PET_QUOTES.length)];
     setLoadingText(randomQuote);
     setError('');
+    // SPEED BOOST: Kurangi waktu jeda pindah halaman dari 2000ms ke 300ms
     setTimeout(() => {
       setCurrentPage(pageNumber);
       setIsLoading(false);
-    }, 2000);
+    }, 300);
   };
 
   const handleInvoiceSubmit = async () => {
@@ -124,10 +123,11 @@ export default function App() {
       setTokens(data.tokens);
       setLoadingText(PET_QUOTES[Math.floor(Math.random() * PET_QUOTES.length)]);
       
+      // SPEED BOOST: Kurangi jeda dari 1000ms ke 300ms
       setTimeout(() => {
         setCurrentPage(2);
         setIsLoading(false);
-      }, 1000);
+      }, 300);
 
     } catch (err) {
       setIsLoading(false);
@@ -142,12 +142,41 @@ export default function App() {
         setError('Please keep the file size under 5MB.');
         return;
       }
+      
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPetImage(reader.result);
-        setError('');
-        // NOTE: Auto-Next telah dihapus. 
-        // User sekarang bisa melihat preview dulu dan punya tombol "Next".
+        // SPEED BOOST: Kompresi Gambar Otomatis (Auto Resize)
+        // Mengecilkan foto agar pengiriman ke server Vercel jauh lebih cepat
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 800; // Maksimal ukuran 800px (Cukup untuk dibaca AI Vision)
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Konversi ke JPEG dengan kualitas 80% (Menghemat memori drastis)
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          setPetImage(compressedDataUrl);
+          setError('');
+        };
+        img.src = reader.result;
       };
       reader.readAsDataURL(file);
     }
@@ -164,53 +193,51 @@ export default function App() {
     }
 
     setTokens(prev => prev - 1);
-    setIsLoading(true);
-    setLoadingText(PET_QUOTES[Math.floor(Math.random() * PET_QUOTES.length)]);
     
-    setTimeout(async () => {
-      setCurrentPage(4);
-      setIsLoading(false);
-      setIsGenerating(true);
-      setGeneratedImages([]);
-      
-      const promptsToRun = PROMPTS[selectedStyle];
+    // Pindah layar ke halaman 4 (Loading Generation) secara instant
+    setCurrentPage(4);
+    setIsGenerating(true);
+    setGeneratedImages([]);
+    setError('');
+    
+    const promptsToRun = PROMPTS[selectedStyle];
 
-      try {
-        const base64Data = petImage.split(',')[1];
-        const mimeType = petImage.split(';')[0].split(':')[1];
+    try {
+      const base64Data = petImage.split(',')[1];
+      const mimeType = petImage.split(';')[0].split(':')[1];
 
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompts: promptsToRun,
-            base64Image: base64Data,
-            mimeType: mimeType,
-            etsyInvoice: etsyInvoice
-          })
-        });
+      // Request API langsung dieksekusi tanpa jeda buatan (setTimeout)
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompts: promptsToRun,
+          base64Image: base64Data,
+          mimeType: mimeType,
+          etsyInvoice: etsyInvoice
+        })
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (!response.ok) {
-           throw new Error(data.message || 'Gagal generate gambar.');
-        }
-
-        if (data.images && data.images.length > 0) {
-           setGeneratedImages(data.images);
-        } else {
-           throw new Error('Tidak ada gambar yang dihasilkan.');
-        }
-
-      } catch (err) {
-        console.error(err);
-        setError(err.message || "Something went wrong while painting. Please try again!");
-        setTokens(prev => prev + 1); 
-        setCurrentPage(3); 
-      } finally {
-        setIsGenerating(false);
+      if (!response.ok) {
+         throw new Error(data.message || 'Gagal generate gambar.');
       }
-    }, 2000);
+
+      if (data.images && data.images.length > 0) {
+         setGeneratedImages(data.images);
+      } else {
+         throw new Error('Tidak ada gambar yang dihasilkan.');
+      }
+
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Something went wrong while painting. Please try again!");
+      setTokens(prev => prev + 1); 
+      setCurrentPage(3); 
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const executeDownload = (url, filename) => {
@@ -282,10 +309,10 @@ export default function App() {
       } catch (err) {
         showToast("Terjadi kendala saat download.", "error");
       }
-    }, 500); 
+    }, 100); 
   };
 
-  // FITUR BARU: Enhanced High-Res Download (Upscaling via Canvas)
+  // Enhanced High-Res Download
   const handleEnhancedDownload = (imgUrl, index) => {
     showToast("Meningkatkan kualitas gambar (High-Res)...", "success");
     const fileName = `RoyalPet_Enhanced_${selectedStyle.replace(/\s+/g, '')}_0${index + 1}.png`;
@@ -294,14 +321,12 @@ export default function App() {
       try {
         const img = new window.Image();
         img.onload = () => {
-          // Memperbesar ukuran resolusi gambar hingga 3x lipat untuk hasil print tajam (High DPI)
           const scaleFactor = 3; 
           const canvas = document.createElement('canvas');
           canvas.width = img.width * scaleFactor;
           canvas.height = img.height * scaleFactor;
           const ctx = canvas.getContext('2d');
           
-          // Mengaktifkan penghalus gambar (Image Smoothing) maksimal
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           
@@ -319,7 +344,7 @@ export default function App() {
       } catch (err) {
         showToast("Terjadi kendala saat proses enhancement.", "error");
       }
-    }, 500);
+    }, 100);
   };
 
   if (isLoading) {
@@ -427,7 +452,6 @@ export default function App() {
               />
               
               {!petImage ? (
-                // Tampilan Sebelum Ada Gambar
                 <div 
                   onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-purple-200 bg-purple-50/50 hover:bg-pink-50/80 rounded-3xl p-10 text-center cursor-pointer transition-all relative overflow-hidden group"
@@ -437,11 +461,10 @@ export default function App() {
                       <Upload className="w-8 h-8 text-pink-500" />
                     </div>
                     <p className="font-bold text-xl text-purple-900">Tap to browse</p>
-                    <p className="text-sm mt-2 text-purple-500 font-medium">JPG or PNG (Max 5MB)</p>
+                    <p className="text-sm mt-2 text-purple-500 font-medium">JPG or PNG</p>
                   </div>
                 </div>
               ) : (
-                // Tampilan Setelah Gambar Ter-Upload (Revisi)
                 <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
                   <div className="relative w-full aspect-square max-w-[240px] mx-auto rounded-3xl shadow-lg border-4 border-white overflow-hidden bg-purple-50">
                     <img 
@@ -456,7 +479,7 @@ export default function App() {
                       onClick={() => fileInputRef.current?.click()}
                       className="flex-1 bg-purple-50 text-purple-700 font-bold py-4 rounded-2xl border-2 border-purple-200 hover:bg-purple-100 transition-all text-sm"
                     >
-                      Change Photo
+                      Change
                     </button>
                     <button 
                       onClick={() => goToPage(3)}
@@ -564,7 +587,6 @@ export default function App() {
                   {generatedImages[index] && (
                     <div className="p-4 bg-white border-t border-purple-50">
                       
-                      {/* FITUR BARU: Enhanced High-Res Download */}
                       <button 
                         onClick={() => handleEnhancedDownload(generatedImages[index], index)}
                         className="w-full mb-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2"
