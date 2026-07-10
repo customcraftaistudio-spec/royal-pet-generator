@@ -573,7 +573,7 @@ export default function App() {
                         Enhance & Download High-Res
                       </button>
 
-                      <p className="text-[10px] font-bold text-purple-400 mb-2 mt-4 text-center uppercase tracking-wider">Atau Download File Standar:</p>
+                      <p className="text-[10px] font-bold text-purple-400 mb-2 mt-4 text-center uppercase tracking-wider">Or Download Standard Size File:</p>
                       <div className="grid grid-cols-3 gap-2">
                         <button 
                           onClick={() => handleDownload(generatedImages[index], index, 'jpg')}
