@@ -117,7 +117,7 @@ export default function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Gagal memverifikasi invoice.');
+        throw new Error(data.message || 'Invoice Verified Failed.');
       }
 
       setTokens(data.tokens);
@@ -221,13 +221,13 @@ export default function App() {
       const data = await response.json();
 
       if (!response.ok) {
-         throw new Error(data.message || 'Gagal generate gambar.');
+         throw new Error(data.message || 'Error Generating Image.');
       }
 
       if (data.images && data.images.length > 0) {
          setGeneratedImages(data.images);
       } else {
-         throw new Error('Tidak ada gambar yang dihasilkan.');
+         throw new Error('No IMage Generated.');
       }
 
     } catch (err) {
@@ -251,7 +251,7 @@ export default function App() {
       showToast("Download dimulai!", "success");
     } catch (err) {
       console.error(err);
-      showToast("Gagal memulai download. Silakan coba lagi.", "error");
+      showToast("Download Failed. Please Try Again.", "error");
     }
   };
 
@@ -303,18 +303,18 @@ export default function App() {
             };
             img.src = imgUrl;
           } else {
-            showToast("Sistem pembuat PDF sedang dimuat, coba klik lagi.", "error");
+            showToast("PDF Creator System is on process, try to click once.", "error");
           }
         }
       } catch (err) {
-        showToast("Terjadi kendala saat download.", "error");
+        showToast("Error on download process.", "error");
       }
     }, 100); 
   };
 
   // Enhanced High-Res Download
   const handleEnhancedDownload = (imgUrl, index) => {
-    showToast("Meningkatkan kualitas gambar (High-Res)...", "success");
+    showToast("Increasing Image Quality (High-Res)...", "success");
     const fileName = `RoyalPet_Enhanced_${selectedStyle.replace(/\s+/g, '')}_0${index + 1}.png`;
 
     setTimeout(() => {
@@ -342,7 +342,7 @@ export default function App() {
         };
         img.src = imgUrl;
       } catch (err) {
-        showToast("Terjadi kendala saat proses enhancement.", "error");
+        showToast("Error on enhancement process.", "error");
       }
     }, 100);
   };
